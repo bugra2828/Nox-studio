@@ -564,55 +564,27 @@ function renderScript() {
 
 let scriptText = '';
 
-  async function generateScript() {
+function generateScript() {
   const topic = document.getElementById('script-topic').value.trim();
   if (!topic) return;
-  
   const loading = document.getElementById('script-loading');
   const output  = document.getElementById('script-output');
   const btn     = document.getElementById('btn-gen-script');
-  const scriptBox = document.getElementById('script-box');
-
   loading.style.display = 'block';
   output.style.display  = 'none';
   btn.style.opacity     = '.6';
   btn.style.pointerEvents = 'none';
+  btn.querySelector('.ui-btn-inner').lastChild.textContent = ' Generating...';
 
-  try {
-    const prompt = `Write a viral video script about ${topic}. Hook type: ${ddState.hook}. Duration: ${ddState.dur}. Use [HOOK], [BODY], and [CTA] tags.`;
-    
-    const resp = await fetch('/api/replicate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input: { prompt: prompt } })
-    });
-
-    const data = await resp.json();
-    let finalResult = "";
-    
-    if (data.output) {
-        finalResult = Array.isArray(data.output) ? data.output.join('') : data.output;
-    } else {
-        throw new Error("Boş cevap.");
-    }
-
-    scriptText = finalResult;
-    scriptBox.innerHTML = renderScript(scriptText);
-    
-    const simLabel = document.querySelector('.card div[style*="font-style:italic"]');
-    if(simLabel) simLabel.style.display = 'none';
-    
-  } catch (e) {
-    console.error(e);
-    scriptBox.innerHTML = "Hata: API bağlantısı kurulamadı. Lütfen /api/replicate.js dosyasını kontrol et.";
-  }
-
-  loading.style.display = 'none';
-  output.style.display  = 'block';
-  btn.style.opacity     = '1';
-  btn.style.pointerEvents = 'auto';
-}
-
+  setTimeout(() => {
+    scriptText = buildMock(topic, ddState.hook||HOOK_TYPES[0], ddState.dur||DURATION_OPTIONS[0]);
+    document.getElementById('script-box').innerHTML = renderScript(scriptText);
+    loading.style.display = 'none';
+    output.style.display  = 'block';
+    btn.style.opacity     = '1';
+    btn.style.pointerEvents = 'auto';
+    btn.querySelector('.ui-btn-inner').lastChild.textContent = ' Generate Script';
+  }, 2500);
 }
 
 function sendToVoice() {
