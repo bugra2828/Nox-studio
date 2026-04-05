@@ -1,0 +1,1736 @@
+import { useState, useEffect, useRef } from “react”;
+
+/* ─────────────────────────────────────────────────────────────
+NOISE / GRAIN BACKGROUND
+Pure canvas — deep #000 base with animated white grain
+giving a premium film-grain / matte-black texture.
+───────────────────────────────────────────────────────────── */
+function NoiseBackground() {
+const canvasRef = useRef(null);
+
+useEffect(() => {
+const canvas = canvasRef.current;
+const ctx    = canvas.getContext(“2d”);
+let   raf;
+
+```
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+const TILE = 220;
+const offscreen = document.createElement("canvas");
+offscreen.width = offscreen.height = TILE;
+const octx = offscreen.getContext("2d");
+
+function buildTile() {
+  const id = octx.createImageData(TILE, TILE);
+  const d  = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = Math.random() * 255 | 0;
+    d[i] = d[i+1] = d[i+2] = v;
+    d[i+3] = Math.random() * 18 | 0;
+  }
+  octx.putImageData(id, 0, 0);
+}
+
+let frame = 0;
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, W, H);
+  const lift = ctx.createRadialGradient(W*.5, H*.38, 0, W*.5, H*.38, W*.7);
+  lift.addColorStop(0, "rgba(255,255,255,0.028)");
+  lift.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = lift;
+  ctx.fillRect(0, 0, W, H);
+  if (frame % 3 === 0) buildTile();
+  ctx.globalAlpha = 1;
+  for (let x = 0; x < W; x += TILE)
+    for (let y = 0; y < H; y += TILE)
+      ctx.drawImage(offscreen, x, y);
+  const vign = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.72);
+  vign.addColorStop(0, "rgba(0,0,0,0)");
+  vign.addColorStop(1, "rgba(0,0,0,0.72)");
+  ctx.fillStyle = vign;
+  ctx.fillRect(0, 0, W, H);
+  frame++;
+  raf = requestAnimationFrame(draw);
+}
+
+resize(); buildTile(); draw();
+window.addEventListener("resize", resize);
+return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+```
+
+}, []);
+
+return (
+<canvas ref={canvasRef} style={{
+position:“fixed”, inset:0, width:“100%”, height:“100%”,
+zIndex:0, pointerEvents:“none”, display:“block”,
+}}/>
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+SVG ICONS  (monochrome — stroke=“currentColor”)
+───────────────────────────────────────────────────────────── */
+const IconSpark = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+<path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5Z"/>
+<path d="M5 3L5.5 5L7 5.5L5.5 6L5 8L4.5 6L3 5.5L4.5 5Z" opacity=".6"/>
+<path d="M19 14L19.5 16L21 16.5L19.5 17L19 19L18.5 17L17 16.5L18.5 16Z" opacity=".6"/>
+</svg>
+);
+const IconArrow = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+<path d="M5 12h14M13 6l6 6-6 6"/>
+</svg>
+);
+const IconMic = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+<rect x="9" y="2" width="6" height="11" rx="3"/>
+<path d="M5 10a7 7 0 0 0 14 0"/>
+<line x1="12" y1="19" x2="12" y2="22"/>
+<line x1="9"  y1="22" x2="15" y2="22"/>
+</svg>
+);
+const IconLink = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+</svg>
+);
+const IconCaptions = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+<rect x="2" y="5" width="20" height="14" rx="2"/>
+<path d="M7 10h10M7 14h6"/>
+</svg>
+);
+
+/* ─────────────────────────────────────────────────────────────
+UIVERSE BUTTON  (adamgiebl — dark charcoal fits B&W perfectly)
+variant: “primary” | “white” (inverted) | “ghost”
+───────────────────────────────────────────────────────────── */
+function UiBtn({ onClick, icon, variant = “primary”, children, style = {} }) {
+const outerStyle =
+variant === “white”
+? { background: “linear-gradient(180deg,rgb(255,255,255) 0%,rgb(220,220,220) 66%,rgb(235,235,235) 100%)” }
+: variant === “ghost”
+? { background: “linear-gradient(180deg,rgb(30,30,30) 0%,rgb(18,18,18) 66%,rgb(22,22,22) 100%)” }
+: {};
+
+const innerStyle =
+variant === “white”
+? {
+backgroundColor: “rgb(245,245,245)”,
+backgroundImage: “radial-gradient(at 95% 89%,rgb(200,200,200) 0px,transparent 50%),radial-gradient(at 0% 100%,rgb(210,210,210) 0px,transparent 50%),radial-gradient(at 0% 0%,rgb(245,245,245) 0px,transparent 50%)”,
+color: “#000000”,
+textShadow: “none”,
+}
+: variant === “ghost”
+? {
+backgroundColor: “rgb(14,14,14)”,
+backgroundImage: “radial-gradient(at 95% 89%,rgb(8,8,8) 0px,transparent 50%),radial-gradient(at 0% 100%,rgb(10,10,10) 0px,transparent 50%),radial-gradient(at 0% 0%,rgb(14,14,14) 0px,transparent 50%)”,
+color: “rgba(255,255,255,0.35)”,
+}
+: {};
+
+return (
+<button className=“ui-btn” onClick={onClick} style={{ …outerStyle, …style }}>
+<span className="ui-btn-inner" style={innerStyle}>
+{icon ?? <IconSpark />}
+{children}
+</span>
+<div className="ui-btn-overlay" />
+</button>
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+GLOBAL STYLES — Premium Monochrome · Nox Studio
+───────────────────────────────────────────────────────────── */
+const css = `
+@import url(‘https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap’);
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+font-family: ‘Inter’, sans-serif;
+background: #000000;
+color: #ffffff;
+min-height: 100vh;
+overflow-x: hidden;
+-webkit-font-smoothing: antialiased;
+}
+
+/* ── Uiverse.io button by adamgiebl ── */
+.ui-btn {
+font-size: 14px;
+border-radius: 12px;
+background: linear-gradient(180deg, rgb(56,56,56) 0%, rgb(36,36,36) 66%, rgb(41,41,41) 100%);
+color: rgb(218,218,218);
+border: none;
+padding: 2px;
+font-weight: 700;
+cursor: pointer;
+position: relative;
+overflow: hidden;
+font-family: inherit;
+letter-spacing: .2px;
+transition: transform .18s;
+}
+.ui-btn:hover  { transform: translateY(-1px); }
+.ui-btn:active { transform: translateY(0px);  }
+.ui-btn-inner {
+border-radius: 10px;
+padding: 0.72em 1.3em;
+padding-right: 1.15em;
+text-shadow: 0px 0px 20px #4b4b4b;
+width: 100%;
+display: flex;
+align-items: center;
+gap: 10px;
+color: inherit;
+transition: background-color .3s;
+background-color: rgb(29,29,29);
+background-image:
+radial-gradient(at 95% 89%, rgb(15,15,15) 0px, transparent 50%),
+radial-gradient(at 0%  100%, rgb(17,17,17) 0px, transparent 50%),
+radial-gradient(at 0%  0%,   rgb(29,29,29) 0px, transparent 50%);
+white-space: nowrap;
+}
+.ui-btn:hover .ui-btn-inner { background-color: rgb(26,25,25); }
+.ui-btn-overlay {
+position: absolute; inset: 0; pointer-events: none;
+background: repeating-conic-gradient(rgb(48,47,47) 0.0000001%, rgb(51,51,51) 0.000104%) 60% 60% / 600% 600%;
+filter: opacity(10%) contrast(105%);
+-webkit-filter: opacity(10%) contrast(105%);
+border-radius: 12px;
+}
+.ui-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+
+/* ── shell / layout ── */
+.shell   { display: flex; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; }
+.content { flex: 1; padding: 40px 28px; max-width: 700px; width: 100%; margin: 0 auto; }
+
+/* ── topbar ── */
+.topbar {
+display: flex; align-items: center; gap: 16px; padding: 0 24px;
+height: 60px;
+border-bottom: 1px solid rgba(255,255,255,.08);
+background: rgba(0,0,0,.88);
+backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+position: sticky; top: 0; z-index: 20;
+}
+
+/* ── hamburger button — pure white, always visible ── */
+.hbg {
+display: flex; align-items: center; justify-content: center;
+width: 40px; height: 40px; padding: 0; flex-shrink: 0;
+background: rgba(255,255,255,.08);
+border: 1.5px solid rgba(255,255,255,.40);
+border-radius: 8px;
+cursor: pointer;
+transition: border-color .2s, background .2s;
+}
+.hbg:hover { border-color: #ffffff; background: rgba(255,255,255,.16); }
+.hbg svg { display: block; width: 20px; height: 20px; }
+.hbg svg line { stroke: #ffffff; stroke-width: 2.2; stroke-linecap: round; }
+
+/* ── Nox Studio wordmark ── */
+.topbar-logo {
+font-size: 15px; font-weight: 800; color: #ffffff;
+letter-spacing: .5px; white-space: nowrap;
+flex: 1;
+}
+.topbar-logo .dot { color: rgba(255,255,255,.35); font-weight: 400; margin: 0 1px; }
+
+/* current view badge — right side */
+.topbar-badge {
+font-size: 9px; color: rgba(255,255,255,.28);
+letter-spacing: 2.5px; text-transform: uppercase; white-space: nowrap;
+}
+
+/* ── overlay ── */
+.overlay {
+position: fixed; inset: 0; background: rgba(0,0,0,.80);
+z-index: 30; opacity: 0; pointer-events: none; transition: opacity .26s;
+}
+.overlay.on { opacity: 1; pointer-events: all; }
+
+/* ── sidebar ── */
+.sidebar {
+position: fixed; top: 0; left: 0; bottom: 0; width: 272px;
+background: #0b0b0b;
+border-right: 1px solid rgba(255,255,255,.10);
+z-index: 31; transform: translateX(-100%);
+transition: transform .32s cubic-bezier(.22,1,.36,1);
+display: flex; flex-direction: column;
+}
+.sidebar.on { transform: translateX(0); }
+
+.sb-head {
+display: flex; align-items: center; justify-content: space-between;
+padding: 0 20px; height: 60px;
+border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.sb-logo {
+font-size: 14px; font-weight: 800; color: #fff; letter-spacing: .5px;
+}
+.sb-logo .dot { color: rgba(255,255,255,.35); font-weight: 400; }
+
+.sb-close {
+display: flex; align-items: center; justify-content: center;
+width: 32px; height: 32px;
+background: none; border: 1px solid rgba(255,255,255,.15); border-radius: 6px;
+color: #fff; font-size: 16px; cursor: pointer; line-height: 1;
+transition: background .15s, border-color .15s;
+}
+.sb-close:hover { background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.4); }
+
+.sb-nav   { flex: 1; padding: 12px 0; overflow-y: auto; }
+
+/* section label above tool groups */
+.sb-label {
+font-size: 9px; font-weight: 600;
+color: rgba(255,255,255,.35);
+letter-spacing: 2.5px; text-transform: uppercase;
+padding: 14px 20px 5px; display: block;
+}
+
+/* nav link row */
+.sb-link {
+display: flex; align-items: center; gap: 11px; width: 100%;
+padding: 10px 20px; background: none; border: none;
+/* pure white text — no dimming */
+color: #ffffff;
+font-family: ‘Inter’, sans-serif; font-size: 13px; font-weight: 500;
+cursor: pointer; text-align: left;
+transition: background .14s;
+border-left: 2px solid transparent;
+}
+.sb-link:hover  {
+background: rgba(255,255,255,.07);
+border-left-color: rgba(255,255,255,.3);
+}
+.sb-link.active {
+background: rgba(255,255,255,.10);
+border-left-color: #ffffff;
+font-weight: 700;
+}
+
+/* SVG icon wrapper — pure white, no opacity reduction */
+.sb-icon {
+display: flex; align-items: center; justify-content: center;
+width: 20px; height: 20px; flex-shrink: 0;
+}
+.sb-icon svg {
+width: 16px; height: 16px;
+stroke: #ffffff; fill: none;
+stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* status badge */
+.sb-badge {
+font-size: 8px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase;
+padding: 2px 7px;
+border: 1px solid rgba(255,255,255,.25);
+color: #ffffff;
+margin-left: auto; flex-shrink: 0; border-radius: 3px;
+background: rgba(255,255,255,.06);
+}
+
+.sb-foot {
+padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.07);
+font-size: 10px; color: rgba(255,255,255,.25); letter-spacing: .5px;
+}
+
+/* ── typography ── */
+.page-tag   { font-size: 9px; color: rgba(255,255,255,.35); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; }
+.page-title { font-size: 30px; font-weight: 700; letter-spacing: -.6px; margin-bottom: 8px; line-height: 1.12; color: #ffffff; }
+.page-title span { color: #ffffff; }
+.page-desc  { font-size: 13px; color: rgba(255,255,255,.38); margin-bottom: 32px; line-height: 1.75; }
+
+/* ── glass tool card ── */
+.card {
+background: rgba(255,255,255,.03);
+border: 1px solid rgba(255,255,255,.08);
+padding: 22px; margin-bottom: 16px;
+}
+.card-label { font-size: 9px; color: rgba(255,255,255,.3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; display: block; }
+
+/* ── inputs ── */
+.inp {
+width: 100%; background: rgba(255,255,255,.03);
+border: 1px solid rgba(255,255,255,.10); color: #fff;
+font-family: inherit; font-size: 13px; padding: 11px 14px;
+outline: none; transition: border-color .2s;
+}
+.inp:focus { border-color: rgba(255,255,255,.4); }
+.inp::placeholder { color: rgba(255,255,255,.2); }
+
+.ta {
+width: 100%; background: rgba(255,255,255,.03);
+border: 1px solid rgba(255,255,255,.10); color: #fff;
+font-family: inherit; font-size: 13px; padding: 11px 14px;
+outline: none; min-height: 120px; resize: vertical; line-height: 1.65;
+transition: border-color .2s;
+}
+.ta:focus { border-color: rgba(255,255,255,.4); }
+.ta::placeholder { color: rgba(255,255,255,.2); }
+
+/* ── script output ── */
+.script-box {
+background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.08);
+padding: 16px 18px; font-size: 13px; line-height: 1.9;
+margin-top: 14px; white-space: pre-wrap; color: rgba(255,255,255,.75);
+}
+.tag { color: #ffffff; font-weight: 700; opacity: .55; }
+
+/* ── audio mock ── */
+.audio-mock {
+display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+margin-top: 14px;
+}
+.play-btn {
+width: 36px; height: 36px; background: #ffffff; border: none; cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+font-size: 13px; color: #000; flex-shrink: 0; transition: transform .18s, opacity .18s;
+}
+.play-btn:hover { transform: scale(1.08); opacity: .85; }
+.track    { flex: 1; }
+.bar-bg   { height: 1px; background: rgba(255,255,255,.12); }
+.bar-fill { height: 1px; background: #fff; width: 35%; }
+.bar-time { font-size: 10px; color: rgba(255,255,255,.3); margin-top: 7px; }
+
+/* ── video mock ── */
+.video-mock {
+aspect-ratio: 16/9; background: rgba(255,255,255,.03);
+border: 1px solid rgba(255,255,255,.08);
+display: flex; align-items: center; justify-content: center;
+margin-top: 14px; position: relative; overflow: hidden;
+}
+.v-play { font-size: 32px; opacity: .15; }
+.v-cap  {
+position: absolute; bottom: 0; left: 0; right: 0; padding: 10px 14px;
+background: linear-gradient(transparent, rgba(0,0,0,.88));
+display: flex; align-items: center;
+}
+.cap-pill { background: #fff; color: #000; font-size: 11px; padding: 3px 10px; font-weight: 700; letter-spacing: .2px; }
+
+/* ── upload zone ── */
+.upload {
+border: 1px dashed rgba(255,255,255,.15); padding: 38px 20px; text-align: center;
+cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 14px;
+}
+.upload:hover { border-color: rgba(255,255,255,.4); background: rgba(255,255,255,.02); }
+.upload-icon { font-size: 26px; margin-bottom: 10px; display: block; opacity: .5; }
+.upload-txt  { font-size: 11px; color: rgba(255,255,255,.3); }
+
+/* ── summary ── */
+.summary { background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.08); padding: 16px 18px; margin-top: 14px; }
+.sum-row { display: flex; gap: 12px; margin-bottom: 10px; font-size: 12px; align-items: flex-start; }
+.sum-row:last-child { margin-bottom: 0; }
+.sum-key { color: rgba(255,255,255,.3); min-width: 76px; flex-shrink: 0; }
+.sum-val { color: rgba(255,255,255,.75); line-height: 1.55; }
+
+/* ── loading bar — white shimmer ── */
+.load-bar {
+height: 1px;
+background: linear-gradient(90deg,
+rgba(255,255,255,0)  0%,
+rgba(255,255,255,.9) 40%,
+rgba(255,255,255,.9) 60%,
+rgba(255,255,255,0)  100%
+);
+background-size: 200%;
+margin-top: 16px;
+animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+
+/* ── back button ── */
+.back {
+background: none; border: none; color: rgba(255,255,255,.28);
+font-family: inherit; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+cursor: pointer; padding: 0; margin-bottom: 40px;
+display: inline-flex; align-items: center; gap: 7px; transition: color .2s;
+}
+.back:hover { color: rgba(255,255,255,.8); }
+
+/* ── coming-soon ── */
+.cs-wrap  { text-align: center; padding: 100px 24px; }
+.cs-icon  { font-size: 56px; margin-bottom: 24px; display: block; opacity: .18; animation: blink 3s ease-in-out infinite; }
+.cs-title { font-size: 48px; font-weight: 800; letter-spacing: -2.5px; margin-bottom: 12px; color: #fff; }
+.cs-title span { color: #fff; }
+.cs-desc  { font-size: 11px; color: rgba(255,255,255,.25); letter-spacing: 2px; text-transform: uppercase; }
+@keyframes blink { 0%,100%{opacity:.12} 50%{opacity:.35} }
+
+/* ── HERO — centred, maximum impact ── */
+.hero-wrap {
+flex: 1; display: flex; flex-direction: column;
+align-items: center; justify-content: center; text-align: center;
+padding: 80px 28px 100px; max-width: 860px; width: 100%; margin: 0 auto;
+}
+.hero-eyebrow {
+display: inline-flex; align-items: center; gap: 14px;
+font-size: 9px; color: rgba(255,255,255,.35);
+letter-spacing: 4px; text-transform: uppercase; margin-bottom: 36px;
+}
+.hero-eyebrow::before,
+.hero-eyebrow::after { content:’’; display:block; width:32px; height:1px; background:rgba(255,255,255,.2); }
+
+/* decorative vertical line */
+.hero-line {
+width: 1px; height: 56px;
+background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.22), rgba(255,255,255,0));
+margin: 0 auto 36px;
+}
+
+/* massive centred headline */
+.hero-title {
+font-size: clamp(36px, 6.5vw, 76px);
+font-weight: 900;
+letter-spacing: -3.5px;
+line-height: .95;
+color: #ffffff;
+margin-bottom: 32px;
+text-wrap: balance;
+max-width: 820px;
+}
+.hero-title .dim {
+display: block;
+font-size: .38em;
+font-weight: 300;
+letter-spacing: 0px;
+color: rgba(255,255,255,.28);
+margin-top: 22px;
+line-height: 1.6;
+}
+
+.hero-desc {
+font-size: 15px; color: rgba(255,255,255,.38); line-height: 1.8;
+max-width: 520px; margin: 0 auto 52px;
+}
+.hero-cta  { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.hero-hint { font-size: 10px; color: rgba(255,255,255,.22); letter-spacing: 1.5px; text-transform: uppercase; }
+
+/* ── dashboard grid (non-clickable) ── */
+.dash-grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+gap: 1px; background: rgba(255,255,255,.06);
+}
+.d-card {
+background: #000; padding: 28px 22px; cursor: default; position: relative; overflow: hidden;
+}
+.d-card::after { content:’’; position:absolute; bottom:0; left:0; right:0; height:1px; background:rgba(255,255,255,.18); }
+.d-card::before {
+content: attr(data-num);
+position: absolute; bottom: 16px; right: 16px;
+font-size: 52px; font-weight: 900; color: rgba(255,255,255,.03);
+letter-spacing: -3px; line-height: 1; pointer-events: none;
+}
+.d-icon { font-size: 20px; margin-bottom: 16px; opacity: .5; }
+.d-num  { font-size: 9px; color: rgba(255,255,255,.2); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+.d-name { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: #fff; }
+.d-desc { font-size: 11px; color: rgba(255,255,255,.35); line-height: 1.65; }
+
+/* ── scrollbar ── */
+::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
+
+/* ── Script Generator: Hook Type Dropdown ── */
+.hook-row {
+display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; align-items: flex-end;
+}
+.hook-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+.hook-group .card-label { margin-bottom: 0; }
+
+/* ── Custom hook-type dropdown (no <select>, no native picker) ── */
+.dd-wrap {
+position: relative;
+width: 100%;
+user-select: none;
+-webkit-user-select: none;
+}
+
+/* the visible trigger row */
+.dd-trigger {
+display: flex; align-items: center; justify-content: space-between;
+width: 100%;
+background: rgba(255,255,255,.03);
+border: 1px solid rgba(255,255,255,.10);
+color: #fff;
+font-family: ‘Inter’, sans-serif; font-size: 13px; font-weight: 500;
+padding: 11px 14px;
+cursor: pointer;
+transition: border-color .18s;
+outline: none;
+}
+.dd-trigger:hover,
+.dd-trigger.open { border-color: rgba(255,255,255,.4); }
+
+/* chevron SVG inside trigger */
+.dd-chevron {
+width: 14px; height: 14px; flex-shrink: 0; margin-left: 10px;
+stroke: rgba(255,255,255,.5); fill: none;
+stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+transition: transform .18s;
+}
+.dd-trigger.open .dd-chevron { transform: rotate(180deg); }
+
+/* floating options list */
+.dd-menu {
+position: absolute;
+top: calc(100% + 4px); left: 0; right: 0;
+z-index: 200;
+background: #111;
+border: 1px solid rgba(255,255,255,.15);
+overflow: hidden;
+/* entrance animation */
+animation: ddFadeIn .14s ease both;
+}
+@keyframes ddFadeIn {
+from { opacity: 0; transform: translateY(-4px); }
+to   { opacity: 1; transform: translateY(0); }
+}
+
+.dd-option {
+padding: 11px 14px;
+font-family: ‘Inter’, sans-serif; font-size: 13px; font-weight: 400;
+color: rgba(255,255,255,.7);
+cursor: pointer;
+border-left: 2px solid transparent;
+transition: background .12s, color .12s;
+}
+.dd-option:hover {
+background: rgba(255,255,255,.07);
+color: #fff;
+border-left-color: rgba(255,255,255,.3);
+}
+.dd-option.selected {
+color: #fff; font-weight: 600;
+border-left-color: #fff;
+background: rgba(255,255,255,.05);
+}
+
+/* ── Script Summary Cards ── */
+.summary-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 12px;
+margin-top: 16px;
+margin-bottom: 4px;
+}
+@media (max-width: 480px) {
+.summary-grid { grid-template-columns: 1fr; }
+}
+
+.summary-card {
+display: flex;
+flex-direction: column;
+gap: 10px;
+padding: 18px 20px;
+border: 1px solid rgba(255,255,255,.10);
+background: rgba(255,255,255,.02);
+/* no overflow:hidden — text must never clip */
+}
+
+.summary-card-header {
+display: flex;
+align-items: center;
+gap: 9px;
+}
+.summary-card-icon {
+display: flex; align-items: center; justify-content: center;
+width: 28px; height: 28px; flex-shrink: 0;
+border: 1px solid rgba(255,255,255,.12);
+background: rgba(255,255,255,.04);
+}
+.summary-card-icon svg {
+width: 14px; height: 14px;
+stroke: rgba(255,255,255,.7); fill: none;
+stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.summary-card-title {
+font-size: 9px;
+font-weight: 600;
+color: rgba(255,255,255,.35);
+letter-spacing: 2px;
+text-transform: uppercase;
+}
+.summary-card-value {
+font-size: 15px;
+font-weight: 700;
+color: #ffffff;
+letter-spacing: -.2px;
+line-height: 1.3;
+/* guarantee full text is always visible — never truncate */
+white-space: normal;
+word-break: break-word;
+overflow-wrap: anywhere;
+}
+
+/* ── AI Voiceover: settings row ── */
+.voice-settings-row {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 12px;
+margin-top: 16px;
+}
+@media (max-width: 520px) {
+.voice-settings-row { grid-template-columns: 1fr; }
+}
+
+/* ── AI Voiceover: waveform audio player ── */
+.vo-player {
+display: flex; align-items: center; gap: 16px;
+padding: 16px 18px; margin-top: 16px;
+border: 1px solid rgba(255,255,255,.10);
+background: rgba(255,255,255,.02);
+}
+.vo-play-btn {
+width: 42px; height: 42px; flex-shrink: 0;
+background: #fff; border: none; cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+transition: transform .18s, opacity .2s;
+}
+.vo-play-btn:hover { transform: scale(1.07); opacity: .88; }
+.vo-play-btn svg {
+width: 16px; height: 16px; fill: #000; stroke: none;
+}
+.vo-waveform {
+flex: 1; display: flex; align-items: center;
+gap: 3px; height: 36px; overflow: hidden;
+}
+.vo-bar {
+flex: 1; background: rgba(255,255,255,.18);
+border-radius: 1px; transition: background .2s;
+min-width: 2px;
+}
+.vo-bar.active { background: #ffffff; }
+.vo-meta {
+display: flex; flex-direction: column; align-items: flex-end;
+gap: 3px; flex-shrink: 0;
+}
+.vo-time { font-size: 11px; color: #fff; font-weight: 600; letter-spacing: .3px; }
+.vo-filename { font-size: 9px; color: rgba(255,255,255,.3); letter-spacing: 1px; }
+
+/* import script button */
+.import-btn {
+display: inline-flex; align-items: center; gap: 8px;
+background: none; border: 1px solid rgba(255,255,255,.12);
+color: rgba(255,255,255,.65); font-family: ‘Inter’, sans-serif;
+font-size: 11px; font-weight: 500; letter-spacing: .5px;
+padding: 8px 14px; cursor: pointer; margin-bottom: 10px;
+transition: border-color .18s, color .18s, background .18s;
+}
+.import-btn:hover {
+border-color: rgba(255,255,255,.4);
+color: #fff;
+background: rgba(255,255,255,.04);
+}
+
+@media (max-width: 520px) {
+.hero-wrap { padding: 60px 20px 80px; }
+.hero-title { letter-spacing: -2px; }
+.content   { padding: 28px 16px; }
+}
+`;
+
+/* ─────────────────────────────────────────────────────────────
+CONSTANTS
+───────────────────────────────────────────────────────────── */
+const V = {
+HOME:“home”, DASH:“dash”,
+SCRIPT:“script”, VOICE:“voice”, VIDEO:“video”, CAPS:“caps”, LINK:“link”,
+};
+
+const MOCK_SCRIPT = `[HOOK] 90% of viral videos share one secret formula nobody talks about.
+
+[BODY] The algorithm doesn’t reward good content — it rewards pattern interrupts. Here’s the exact 3-second hook framework that top creators use every single time.`;
+
+const MOCK_SUMMARY = {
+title:     “10 Productivity Hacks That Changed My Life”,
+platform:  “YouTube”,
+length:    “8m 42s”,
+topic:     “Productivity / Self-improvement”,
+hook:      “Creator opens with a bold claim backed by a 90-day experiment.”,
+structure: “Hook → Problem → 10 tips (list format) → CTA”,
+angle:     “First-person transformation story with data points.”,
+};
+
+const TOOL_NAV = [
+{ label:“AI Script Generator”,  view:V.SCRIPT, badge:“Beta” },
+{ label:“AI Voiceover”,          view:V.VOICE,  badge:“Live” },
+{ label:“Link to Video”,         view:V.LINK,   badge:“New”  },
+{ label:“Auto Captions”,         view:V.CAPS,   badge:“Live” },
+{ label:“Viral Video Creator”,   view:V.VIDEO,  badge:“Soon” },
+];
+const PAGE_NAV = [
+{ label:“Home”,      view:V.HOME },
+{ label:“Dashboard”, view:V.DASH },
+];
+const VIEW_LABEL = {
+[V.HOME]:“Studio”, [V.DASH]:“Dashboard”, [V.SCRIPT]:“AI Script”,
+[V.VOICE]:“Voiceover”, [V.VIDEO]:“Viral Video”,
+[V.CAPS]:“Auto Captions”, [V.LINK]:“Link to Video”,
+};
+
+/* ─────────────────────────────────────────────────────────────
+HELPERS
+───────────────────────────────────────────────────────────── */
+function strip(t) { return t.replace(/[HOOK]\s*/g,””).replace(/[BODY]\s*/g,””).replace(/[CTA]\s*/g,””).trim(); }
+
+function ScriptOut({ raw }) {
+/* Render each line with markdown-lite support:
+- [HOOK] / [BODY] / [CTA]  → highlighted tag
+- **text**                  → bold white
+- lines starting with -     → bullet row
+- empty lines               → spacer
+*/
+function renderLine(line, idx) {
+const trimmed = line.trim();
+
+```
+/* section tags */
+if (/^\[(HOOK|BODY|CTA)\]/.test(trimmed)) {
+  const tag   = trimmed.match(/^(\[[A-Z]+\])/)[1];
+  const rest  = trimmed.slice(tag.length).trim();
+  return (
+    <div key={idx} style={{marginBottom: 12}}>
+      <span className="tag">{tag}</span>
+      {rest && <span style={{marginLeft: 8}}>{renderInline(rest)}</span>}
+    </div>
+  );
+}
+
+/* blank line → spacer */
+if (trimmed === "") return <div key={idx} style={{height: 8}} />;
+
+/* bullet point */
+if (trimmed.startsWith("- ") || trimmed.startsWith("• ")) {
+  return (
+    <div key={idx} style={{display:"flex", gap:8, marginBottom:5, paddingLeft:4}}>
+      <span style={{color:"rgba(255,255,255,.35)", flexShrink:0}}>—</span>
+      <span style={{lineHeight:1.7}}>{renderInline(trimmed.slice(2))}</span>
+    </div>
+  );
+}
+
+/* normal line */
+return <div key={idx} style={{marginBottom:5, lineHeight:1.75}}>{renderInline(trimmed)}</div>;
+```
+
+}
+
+function renderInline(text) {
+/* bold: **text** → <strong> */
+const parts = text.split(/**(.*?)**/g);
+return parts.map((p, i) =>
+i % 2 === 1
+? <strong key={i} style={{color:”#fff”, fontWeight:700}}>{p}</strong>
+: <span key={i}>{p}</span>
+);
+}
+
+return (
+<div className=“script-box” style={{fontSize:13, lineHeight:1.8}}>
+{raw.split(”\n”).map((line, i) => renderLine(line, i))}
+</div>
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+SHELL — topbar (hamburger + Nox Studio wordmark) + sidebar
+───────────────────────────────────────────────────────────── */
+function Shell({ view, onNav, children }) {
+const [open, setOpen] = useState(false);
+const go = v => { setOpen(false); onNav(v); };
+
+return (
+<>
+<style>{css}</style>
+
+```
+  {/* dim overlay */}
+  <div className={`overlay${open ? " on" : ""}`} onClick={() => setOpen(false)} />
+
+  {/* ── sidebar ── */}
+  <div className={`sidebar${open ? " on" : ""}`}>
+    <div className="sb-head">
+      <span className="sb-logo">Nox<span className="dot"> · </span>Studio</span>
+      <button className="sb-close" onClick={() => setOpen(false)} aria-label="Close menu">✕</button>
+    </div>
+
+    <div className="sb-nav">
+      <span className="sb-label">Tools</span>
+
+      {/* AI Script Generator */}
+      <button className={`sb-link${view===V.SCRIPT?" active":""}`} onClick={()=>go(V.SCRIPT)}>
+        <span className="sb-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg>
+        </span>
+        AI Script Generator
+        <span className="sb-badge">Beta</span>
+      </button>
+
+      {/* AI Voiceover */}
+      <button className={`sb-link${view===V.VOICE?" active":""}`} onClick={()=>go(V.VOICE)}>
+        <span className="sb-icon">
+          <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+        </span>
+        AI Voiceover
+        <span className="sb-badge">Live</span>
+      </button>
+
+      {/* Link to Video */}
+      <button className={`sb-link${view===V.LINK?" active":""}`} onClick={()=>go(V.LINK)}>
+        <span className="sb-icon">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </span>
+        Link to Video
+        <span className="sb-badge">New</span>
+      </button>
+
+      {/* Auto Captions */}
+      <button className={`sb-link${view===V.CAPS?" active":""}`} onClick={()=>go(V.CAPS)}>
+        <span className="sb-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 10h10M7 14h6"/></svg>
+        </span>
+        Auto Captions
+        <span className="sb-badge">Live</span>
+      </button>
+
+      {/* Viral Video Creator */}
+      <button className={`sb-link${view===V.VIDEO?" active":""}`} onClick={()=>go(V.VIDEO)}>
+        <span className="sb-icon">
+          <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        </span>
+        Viral Video Creator
+        <span className="sb-badge">Soon</span>
+      </button>
+
+      <span className="sb-label" style={{marginTop:8}}>Navigate</span>
+
+      {/* Home */}
+      <button className={`sb-link${view===V.HOME?" active":""}`} onClick={()=>go(V.HOME)}>
+        <span className="sb-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+        </span>
+        Home
+      </button>
+
+      {/* Dashboard */}
+      <button className={`sb-link${view===V.DASH?" active":""}`} onClick={()=>go(V.DASH)}>
+        <span className="sb-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </span>
+        Dashboard
+      </button>
+    </div>
+
+    <div className="sb-foot">Nox Studio · v1.0</div>
+  </div>
+
+  {/* ── main shell ── */}
+  <div className="shell">
+
+    {/* ── topbar: hamburger · wordmark · current view badge ── */}
+    <div className="topbar">
+
+      {/* 3-line hamburger — pure white SVG, always visible */}
+      <button
+        className="hbg"
+        onClick={() => setOpen(true)}
+        aria-label="Open navigation menu"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <line x1="3" y1="6"  x2="21" y2="6"  />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+
+      {/* Nox Studio wordmark — top-left, bold white */}
+      <span className="topbar-logo">
+        Nox<span className="dot"> · </span>Studio
+      </span>
+
+      {/* current view label — right side */}
+      <span className="topbar-badge">{VIEW_LABEL[view] ?? ""}</span>
+    </div>
+
+    {children}
+  </div>
+</>
+```
+
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+VIEW — HOME  (updated hero copy)
+───────────────────────────────────────────────────────────── */
+function HomeView({ onNav }) {
+return (
+<div className="hero-wrap">
+<div className="hero-eyebrow">Nox Studio · AI Content Suite</div>
+
+```
+  <div className="hero-line" />
+
+  <h1 className="hero-title">
+    Master the Dark Art
+    <br />of Viral Content
+    <br />with Nox Studio.
+    <span className="dim">
+      Five AI tools. One obsidian studio.<br />
+      No editor. No experience required.
+    </span>
+  </h1>
+
+  <p className="hero-desc">
+    Write scroll-stopping scripts, clone any voice, turn any link into
+    content, burn-in captions, and auto-edit video — all in seconds.
+  </p>
+
+  <div className="hero-cta">
+    <UiBtn onClick={() => onNav(V.DASH)} icon={<IconArrow />}>
+      Enter the Studio
+    </UiBtn>
+    <span className="hero-hint">Open the menu to pick a tool</span>
+  </div>
+</div>
+```
+
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+VIEW — DASHBOARD  (5 non-clickable display cards)
+───────────────────────────────────────────────────────────── */
+function DashView() {
+const cards = [
+{ icon:“✦”, num:“01”, name:“AI Script”,          desc:“Hook-first scripts optimised for any niche and platform.”     },
+{ icon:“◉”, num:“02”, name:“AI Voiceover”,        desc:“Studio-quality voice synthesis straight from your script.”    },
+{ icon:“⬔”, num:“03”, name:“Link to Video”,       desc:“Paste any YouTube or Instagram URL and get a viral rebuild.”  },
+{ icon:“◈”, num:“04”, name:“Auto Captions”,       desc:“Burned-in captions that dramatically boost watch-time.”       },
+{ icon:“⬡”, num:“05”, name:“Viral Video Creator”, desc:“Auto-edit and sequence clips for maximum audience retention.” },
+];
+return (
+<div className="content">
+<div className="page-tag">Dashboard</div>
+<h2 className="page-title">Your Studio</h2>
+<p className="page-desc">Use the sidebar menu to open any tool.</p>
+<div className="dash-grid">
+{cards.map(c => (
+<div key={c.num} className="d-card" data-num={c.num}>
+<div className="d-icon">{c.icon}</div>
+<div className="d-num">{c.num}</div>
+<div className="d-name">{c.name}</div>
+<div className="d-desc">{c.desc}</div>
+</div>
+))}
+</div>
+</div>
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+VIEW — SCRIPT GENERATOR
+Custom div-based dropdowns (no <select>, bypasses iOS picker):
+• Hook Type
+• Target Duration
+Analytics bar: Est. Duration · Hook Style
+───────────────────────────────────────────────────────────── */
+const HOOK_TYPES = [
+“Controversial”,
+“Question-Based”,
+“Story-Driven”,
+“Result-Oriented”,
+“Mistake-Avoidance”,
+“Urgency-Based”,
+];
+
+const DURATION_OPTIONS = [
+“0 – 30 seconds”,
+“30 – 60 seconds”,
+“1 – 2 minutes”,
+];
+
+function ScriptView({ onBack, setText, onNav }) {
+const [topic,        setTopic]        = useState(””);
+const [isHookOpen,   setIsHookOpen]   = useState(false);
+const [selectedHook, setSelectedHook] = useState(“Controversial”);
+const [isDurOpen,    setIsDurOpen]    = useState(false);
+const [selectedDur,  setSelectedDur]  = useState(“0 – 30 seconds”);
+const [script,       setScript]       = useState(””);
+const [loading,      setLoading]      = useState(false);
+
+/* ── Simulation Mode: dynamic mock script ── */
+function buildMockScript(topic, hook, duration) {
+const t = topic || “your topic”;
+
+```
+const hooks = {
+  "Controversial":    `**Nobody wants to hear this about ${t} — but it's true.**`,
+  "Question-Based":   `**What if everything you knew about ${t} was completely wrong?**`,
+  "Story-Driven":     `**I almost quit ${t} entirely. Then one thing changed everything.**`,
+  "Result-Oriented":  `**I went from zero to results with ${t} in under 30 days. Here's exactly how.**`,
+  "Mistake-Avoidance":`**Stop. If you're doing ${t} this way, you're wasting your time.**`,
+  "Urgency-Based":    `**The window for ${t} is closing. Most people will miss it entirely.**`,
+};
+
+const bodies = {
+  "0 – 30 seconds": [
+    `Here's what the top 1% already know about **${t}**:`,
+    ``,
+    `- The common approach is broken by design`,
+    `- **Speed beats perfection** every single time`,
+    `- One focused action today outweighs a week of planning`,
+    ``,
+    `You don't need more information. You need to **start now.**`,
+  ],
+  "30 – 60 seconds": [
+    `Most people approach **${t}** the same way — and wonder why they're stuck.`,
+    ``,
+    `Here's the framework that actually works:`,
+    ``,
+    `- **Step 1:** Strip it down to the single most important action`,
+    `- **Step 2:** Execute that action before you feel ready`,
+    `- **Step 3:** Measure the result, not the effort`,
+    `- **Step 4:** Double down on what works, cut everything else`,
+    ``,
+    `The secret isn't a new tactic. It's **radical consistency** on the basics.`,
+  ],
+  "1 – 2 minutes": [
+    `Let me tell you what took me years to figure out about **${t}**.`,
+    ``,
+    `The mainstream advice is designed for average results. If you want to stand out, you need a different lens.`,
+    ``,
+    `**The three pillars nobody talks about:**`,
+    ``,
+    `- **Clarity over complexity** — most people overcomplicate ${t} because complexity feels like progress`,
+    `- **Momentum over motivation** — don't wait to feel inspired, build a system that works without it`,
+    `- **Output over input** — stop consuming content about ${t} and start producing results from it`,
+    ``,
+    `I spent 18 months doing it the wrong way. The shift happened when I stopped optimising the plan and started **executing the minimum viable version.**`,
+    ``,
+    `The result? Everything changed. And it can for you too.`,
+  ],
+};
+
+const ctas = {
+  "Controversial":    `**Follow for more uncomfortable truths about ${t}.**`,
+  "Question-Based":   `**Drop a comment — what's your take on ${t}?**`,
+  "Story-Driven":     `**Save this. You'll want to come back to it.**`,
+  "Result-Oriented":  `**Follow for the full breakdown — link in bio.**`,
+  "Mistake-Avoidance":`**Share this with someone who needs to hear it.**`,
+  "Urgency-Based":    `**Act now. The people who wait always regret it.**`,
+};
+
+const bodyLines = bodies[duration] || bodies["30 – 60 seconds"];
+
+return [
+  "[HOOK]",
+  hooks[hook] || hooks["Controversial"],
+  "",
+  "[BODY]",
+  ...bodyLines,
+  "",
+  "[CTA]",
+  ctas[hook] || ctas["Controversial"],
+].join("\n");
+```
+
+}
+
+function generate() {
+if (!topic.trim()) return;
+setLoading(true);
+setScript(””);
+setTimeout(() => {
+setScript(buildMockScript(topic, selectedHook, selectedDur));
+setLoading(false);
+}, 2500);
+}
+
+/* strips [HOOK] / [BODY] / [CTA] tags, saves clean text, navigates to Voice */
+function sendToVoice() { setText(strip(script)); onNav(V.VOICE); }
+
+/* close both menus when clicking outside */
+function closeAll() {
+setIsHookOpen(false);
+setIsDurOpen(false);
+}
+
+return (
+<div className="content" onClick={closeAll}>
+<button className=“back” onClick={e => { e.stopPropagation(); onBack(); }}>← Back to Dashboard</button>
+<div className="page-tag">Tool 01</div>
+<h2 className="page-title">AI Script Generator</h2>
+<p className="page-desc">Choose a hook style and target duration, then enter your topic.</p>
+
+```
+  <div className="card" onClick={e => e.stopPropagation()}>
+
+    {/* ── Row 1: Hook Type + Target Duration ── */}
+    <div className="hook-row" style={{marginBottom: 14}}>
+
+      {/* ── Hook Type — custom div dropdown ── */}
+      <div className="hook-group">
+        <span className="card-label">Hook Type</span>
+        <div className="dd-wrap">
+          <div
+            className={`dd-trigger${isHookOpen ? " open" : ""}`}
+            onClick={e => { e.stopPropagation(); setIsHookOpen(o => !o); setIsDurOpen(false); }}
+            role="button"
+            aria-haspopup="listbox"
+            aria-expanded={isHookOpen}
+          >
+            <span>{selectedHook}</span>
+            <svg className="dd-chevron" viewBox="0 0 24 24">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          {isHookOpen && (
+            <div className="dd-menu" role="listbox" onClick={e => e.stopPropagation()}>
+              {HOOK_TYPES.map(h => (
+                <div
+                  key={h}
+                  role="option"
+                  aria-selected={h === selectedHook}
+                  className={`dd-option${h === selectedHook ? " selected" : ""}`}
+                  onClick={() => { setSelectedHook(h); setIsHookOpen(false); }}
+                >
+                  {h}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Target Duration — same custom div dropdown pattern ── */}
+      <div className="hook-group">
+        <span className="card-label">Target Duration</span>
+        <div className="dd-wrap">
+          <div
+            className={`dd-trigger${isDurOpen ? " open" : ""}`}
+            onClick={e => { e.stopPropagation(); setIsDurOpen(o => !o); setIsHookOpen(false); }}
+            role="button"
+            aria-haspopup="listbox"
+            aria-expanded={isDurOpen}
+          >
+            <span>{selectedDur}</span>
+            <svg className="dd-chevron" viewBox="0 0 24 24">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          {isDurOpen && (
+            <div className="dd-menu" role="listbox" onClick={e => e.stopPropagation()}>
+              {DURATION_OPTIONS.map(d => (
+                <div
+                  key={d}
+                  role="option"
+                  aria-selected={d === selectedDur}
+                  className={`dd-option${d === selectedDur ? " selected" : ""}`}
+                  onClick={() => { setSelectedDur(d); setIsDurOpen(false); }}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* ── Row 2: Topic / Niche input ── */}
+    <div style={{marginBottom: 14}}>
+      <span className="card-label">Topic / Niche</span>
+      <input
+        className="inp"
+        placeholder="e.g. morning routine for productivity"
+        value={topic}
+        onChange={e => setTopic(e.target.value)}
+        onKeyDown={e => e.key === "Enter" && generate()}
+      />
+    </div>
+
+    {/* ── Script Summary Cards ── */}
+    <div className="summary-grid">
+
+      {/* Card 1 — Target Duration */}
+      <div className="summary-card">
+        <div className="summary-card-header">
+          <div className="summary-card-icon">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 7 12 12 15.5 14.5"/>
+            </svg>
+          </div>
+          <span className="summary-card-title">Target Duration</span>
+        </div>
+        <div className="summary-card-value">{selectedDur}</div>
+      </div>
+
+      {/* Card 2 — Viral Hook Type */}
+      <div className="summary-card">
+        <div className="summary-card-header">
+          <div className="summary-card-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <span className="summary-card-title">Viral Hook</span>
+        </div>
+        <div className="summary-card-value">{selectedHook}</div>
+      </div>
+
+    </div>
+
+    <div className="btn-row">
+      <UiBtn onClick={generate} icon={<IconSpark />} style={{ opacity: loading ? .6 : 1, pointerEvents: loading ? "none" : "auto" }}>
+        {loading ? "Generating…" : "Generate Script"}
+      </UiBtn>
+    </div>
+  </div>
+
+  {loading && <div className="load-bar" />}
+
+  {script && (
+    <div className="card">
+      {/* Simulation Mode indicator */}
+      <div style={{
+        marginBottom: 14,
+        fontSize: 11,
+        fontStyle: "italic",
+        color: "rgba(255,255,255,.35)",
+        letterSpacing: ".3px",
+      }}>
+        ✦ Simulation Mode — UI Testing
+      </div>
+      <span className="card-label">Generated Script</span>
+      <ScriptOut raw={script} />
+      <div className="btn-row">
+        <UiBtn onClick={sendToVoice} icon={<IconMic />} variant="white">
+          Send to Voiceover
+        </UiBtn>
+        <UiBtn onClick={() => { setScript(""); setTopic(""); }} icon={<IconArrow />} variant="ghost">
+          Reset
+        </UiBtn>
+      </div>
+    </div>
+  )}
+</div>
+```
+
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+VIEW — AI VOICEOVER
+• Import Latest Script button
+• Editable textarea
+• 3 custom div dropdowns (Voice Profile, Tone, Pace)
+• Uiverse Generate Voiceover button
+• Waveform audio player
+───────────────────────────────────────────────────────────── */
+
+/* Voice dropdown data */
+const VOICE_PROFILES = [“The Storyteller”, “The Analyst”, “The Hype”];
+const TONE_OPTIONS   = [“Conversational”, “Serious”, “Energetic”, “Whisper”];
+const PACE_OPTIONS   = [“0.8x”, “1.0x”, “1.25x”];
+
+/* Static waveform bar heights — gives a natural audio-wave silhouette */
+const WAVE_HEIGHTS = [
+30,55,40,70,85,60,45,90,75,50,
+65,80,55,40,72,88,60,45,70,55,
+42,68,82,58,48,76,90,62,50,38,
+66,80,54,44,72,86,60,48,74,56,
+];
+
+function VoiceView({ onBack, text }) {
+/* script textarea — editable, pre-filled from shared state */
+const [script,       setScript]       = useState(text || “”);
+
+/* Voice Profile dropdown */
+const [isVoiceOpen,  setIsVoiceOpen]  = useState(false);
+const [voiceProfile, setVoiceProfile] = useState(“The Storyteller”);
+
+/* Tone dropdown */
+const [isToneOpen,   setIsToneOpen]   = useState(false);
+const [tone,         setTone]         = useState(“Conversational”);
+
+/* Pace dropdown */
+const [isPaceOpen,   setIsPaceOpen]   = useState(false);
+const [pace,         setPace]         = useState(“1.0x”);
+
+/* generation state */
+const [loading,      setLoading]      = useState(false);
+const [done,         setDone]         = useState(false);
+const [playing,      setPlaying]      = useState(false);
+
+/* pre-fill when parent injects new shared script */
+const importScript = () => setScript(text || “”);
+
+function closeAllDropdowns() {
+setIsVoiceOpen(false);
+setIsToneOpen(false);
+setIsPaceOpen(false);
+}
+
+function generate() {
+if (!script.trim()) return;
+setLoading(true);
+setTimeout(() => { setDone(true); setLoading(false); }, 1400);
+}
+
+/* active bar count proportional to fake progress */
+const activeBars = playing ? Math.round(WAVE_HEIGHTS.length * 0.35) : 0;
+
+return (
+<div className="content" onClick={closeAllDropdowns}>
+<button className=“back” onClick={e => { e.stopPropagation(); onBack(); }}>
+← Back to Dashboard
+</button>
+<div className="page-tag">Tool 02</div>
+<h2 className="page-title">AI Voiceover</h2>
+<p className="page-desc">Craft your voice, choose your tone, and generate studio-quality audio.</p>
+
+```
+  {/* ── Script Input Card ── */}
+  <div className="card" onClick={e => e.stopPropagation()}>
+
+    {/* Import Latest Script button */}
+    <button className="import-btn" onClick={importScript}>
+      ✨ Import Latest Script
+    </button>
+
+    <span className="card-label">Script</span>
+    <textarea
+      className="ta"
+      style={{ minHeight: 140 }}
+      value={script}
+      onChange={e => setScript(e.target.value)}
+      placeholder="Paste or import a script to turn into audio…"
+    />
+
+    {/* ── Voice Settings: 3 custom div dropdowns ── */}
+    <div className="voice-settings-row">
+
+      {/* Voice Profile */}
+      <div>
+        <span className="card-label" style={{display:'block', marginBottom:6}}>Voice Profile</span>
+        <div className="dd-wrap">
+          <div
+            className={`dd-trigger${isVoiceOpen ? " open" : ""}`}
+            onClick={() => { setIsVoiceOpen(o => !o); setIsToneOpen(false); setIsPaceOpen(false); }}
+            role="button" aria-haspopup="listbox" aria-expanded={isVoiceOpen}
+          >
+            <span>{voiceProfile}</span>
+            <svg className="dd-chevron" viewBox="0 0 24 24">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          {isVoiceOpen && (
+            <div className="dd-menu" role="listbox">
+              {VOICE_PROFILES.map(v => (
+                <div
+                  key={v} role="option" aria-selected={v === voiceProfile}
+                  className={`dd-option${v === voiceProfile ? " selected" : ""}`}
+                  onClick={() => { setVoiceProfile(v); setIsVoiceOpen(false); }}
+                >{v}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tone */}
+      <div>
+        <span className="card-label" style={{display:'block', marginBottom:6}}>Tone</span>
+        <div className="dd-wrap">
+          <div
+            className={`dd-trigger${isToneOpen ? " open" : ""}`}
+            onClick={() => { setIsToneOpen(o => !o); setIsVoiceOpen(false); setIsPaceOpen(false); }}
+            role="button" aria-haspopup="listbox" aria-expanded={isToneOpen}
+          >
+            <span>{tone}</span>
+            <svg className="dd-chevron" viewBox="0 0 24 24">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          {isToneOpen && (
+            <div className="dd-menu" role="listbox">
+              {TONE_OPTIONS.map(t => (
+                <div
+                  key={t} role="option" aria-selected={t === tone}
+                  className={`dd-option${t === tone ? " selected" : ""}`}
+                  onClick={() => { setTone(t); setIsToneOpen(false); }}
+                >{t}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Pace */}
+      <div>
+        <span className="card-label" style={{display:'block', marginBottom:6}}>Pace</span>
+        <div className="dd-wrap">
+          <div
+            className={`dd-trigger${isPaceOpen ? " open" : ""}`}
+            onClick={() => { setIsPaceOpen(o => !o); setIsVoiceOpen(false); setIsToneOpen(false); }}
+            role="button" aria-haspopup="listbox" aria-expanded={isPaceOpen}
+          >
+            <span>{pace}</span>
+            <svg className="dd-chevron" viewBox="0 0 24 24">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          {isPaceOpen && (
+            <div className="dd-menu" role="listbox">
+              {PACE_OPTIONS.map(p => (
+                <div
+                  key={p} role="option" aria-selected={p === pace}
+                  className={`dd-option${p === pace ? " selected" : ""}`}
+                  onClick={() => { setPace(p); setIsPaceOpen(false); }}
+                >{p}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+    </div>{/* end voice-settings-row */}
+
+    {/* Generate button */}
+    <div className="btn-row" style={{marginTop:18}}>
+      <UiBtn onClick={generate} icon={<IconMic />}>Generate Voiceover</UiBtn>
+    </div>
+  </div>
+
+  {loading && <div className="load-bar" />}
+
+  {/* ── Waveform Audio Player ── */}
+  {done && (
+    <div className="card" style={{marginTop:0}}>
+      <span className="card-label">Audio Output</span>
+      <div className="vo-player">
+
+        {/* Play / Pause button */}
+        <button className="vo-play-btn" onClick={() => setPlaying(p => !p)}>
+          {playing
+            ? /* pause icon */
+              <svg viewBox="0 0 24 24" fill="#000">
+                <rect x="6" y="4" width="4" height="16" rx="1"/>
+                <rect x="14" y="4" width="4" height="16" rx="1"/>
+              </svg>
+            : /* play icon */
+              <svg viewBox="0 0 24 24" fill="#000">
+                <polygon points="5,3 19,12 5,21"/>
+              </svg>
+          }
+        </button>
+
+        {/* Waveform bars */}
+        <div className="vo-waveform" aria-hidden="true">
+          {WAVE_HEIGHTS.map((h, i) => (
+            <div
+              key={i}
+              className={`vo-bar${i < activeBars ? " active" : ""}`}
+              style={{ height: `${h}%` }}
+            />
+          ))}
+        </div>
+
+        {/* Time + filename */}
+        <div className="vo-meta">
+          <span className="vo-time">{playing ? "0:14" : "0:00"} / 0:38</span>
+          <span className="vo-filename">nox_voice_v1.mp3</span>
+        </div>
+
+      </div>
+    </div>
+  )}
+</div>
+```
+
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+VIEW — LINK TO VIDEO
+───────────────────────────────────────────────────────────── */
+function LinkView({ onBack, setText, onNav }) {
+const [url,     setUrl]     = useState(””);
+const [loading, setLoading] = useState(false);
+const [summary, setSummary] = useState(null);
+
+function analyze() {
+if (!url.trim()) return;
+setLoading(true); setSummary(null);
+setTimeout(() => { setSummary(MOCK_SUMMARY); setLoading(false); }, 2000);
+}
+function createVersion() {
+const built = `[HOOK] ${MOCK_SUMMARY.hook}\n\n[BODY] ${MOCK_SUMMARY.structure} — Rewritten with the ${MOCK_SUMMARY.angle}`;
+setText(strip(built)); onNav(V.SCRIPT);
+}
+
+return (
+<div className="content">
+<button className="back" onClick={onBack}>← Back to Dashboard</button>
+<div className="page-tag">Tool 03</div>
+<h2 className="page-title">Transform any Link into Viral Content</h2>
+<p className="page-desc">Paste a YouTube or Instagram URL and we’ll scrape, analyse, and rebuild it.</p>
+<div className="card">
+<span className="card-label">Video URL</span>
+<input
+className=“inp” placeholder=“Paste YouTube or Instagram link here…”
+value={url} onChange={e => setUrl(e.target.value)}
+onKeyDown={e => e.key === “Enter” && analyze()}
+/>
+<div className="btn-row">
+<UiBtn onClick={analyze} icon={<IconLink />}>Process Link</UiBtn>
+</div>
+</div>
+{loading && (
+<div className=“card” style={{ textAlign: “center”, padding: “32px 20px” }}>
+<div style={{ fontSize: 12, color: “rgba(255,255,255,.3)”, marginBottom: 16, letterSpacing: “1.5px”, textTransform: “uppercase” }}>
+Scraping & Analyzing Video Content…
+</div>
+<div className=“load-bar” style={{ marginTop: 0 }} />
+</div>
+)}
+{summary && (
+<div className="card">
+<span className="card-label">Video Summary</span>
+<div className="summary">
+{[
+[“Title”,     summary.title],
+[“Platform”,  summary.platform],
+[“Length”,    summary.length],
+[“Topic”,     summary.topic],
+[“Hook”,      summary.hook],
+[“Structure”, summary.structure],
+[“Angle”,     summary.angle],
+].map(([k, v]) => (
+<div key={k} className="sum-row">
+<span className="sum-key">{k}</span>
+<span className="sum-val">{v}</span>
+</div>
+))}
+</div>
+<div className="btn-row">
+<UiBtn onClick={createVersion} icon={<IconArrow />} variant=“white”>
+Create New Version
+</UiBtn>
+<UiBtn onClick={() => { setSummary(null); setUrl(””); }} icon={<IconArrow />} variant=“ghost”>
+Reset
+</UiBtn>
+</div>
+</div>
+)}
+</div>
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+VIEW — AUTO CAPTIONS
+───────────────────────────────────────────────────────────── */
+function CapsView({ onBack }) {
+const [uploaded, setUploaded] = useState(false);
+const [done,     setDone]     = useState(false);
+const [loading,  setLoading]  = useState(false);
+
+function generate() {
+setLoading(true);
+setTimeout(() => { setDone(true); setLoading(false); }, 1500);
+}
+
+return (
+<div className="content">
+<button className="back" onClick={onBack}>← Back to Dashboard</button>
+<div className="page-tag">Tool 04</div>
+<h2 className="page-title">Auto Captions</h2>
+<p className="page-desc">Upload a video and get burned-in captions in seconds.</p>
+<div className="card">
+<div className=“upload” onClick={() => setUploaded(true)}>
+<span className="upload-icon">{uploaded ? “✓” : “⬆”}</span>
+<div className="upload-txt">
+{uploaded ? “video_clip.mp4 · ready to process” : “Click to upload your video file”}
+</div>
+</div>
+<UiBtn onClick={generate} icon={<IconCaptions />}>Generate Captions</UiBtn>
+</div>
+{loading && <div className="load-bar" />}
+{done && (
+<div className="card">
+<span className="card-label">Preview</span>
+<div className="video-mock">
+<span className="v-play">▶</span>
+<div className="v-cap">
+<span className="cap-pill">…and THAT is the secret formula.</span>
+</div>
+</div>
+</div>
+)}
+</div>
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+VIEW — VIRAL VIDEO CREATOR
+───────────────────────────────────────────────────────────── */
+function VideoView({ onBack }) {
+return (
+<div className="content">
+<button className="back" onClick={onBack}>← Back to Dashboard</button>
+<div className="cs-wrap">
+<span className="cs-icon">⬡</span>
+<h2 className="cs-title">Coming <span>Soon</span></h2>
+<p className="cs-desc">Viral Video Creator · In development</p>
+</div>
+</div>
+);
+}
+
+/* ─────────────────────────────────────────────────────────────
+APP  (root state + routing — unchanged)
+───────────────────────────────────────────────────────────── */
+export default function App() {
+const [view, setView] = useState(V.HOME);
+const [text, setText] = useState(””);
+const goBack = () => setView(V.DASH);
+
+return (
+<>
+{/* persistent monochrome grain background */}
+<NoiseBackground />
+
+```
+  <Shell view={view} onNav={setView}>
+    {view === V.HOME   && <HomeView   onNav={setView} />}
+    {view === V.DASH   && <DashView   />}
+    {view === V.SCRIPT && <ScriptView onBack={goBack} setText={setText} onNav={setView} />}
+    {view === V.VOICE  && <VoiceView  onBack={goBack} text={text} />}
+    {view === V.LINK   && <LinkView   onBack={goBack} setText={setText} onNav={setView} />}
+    {view === V.CAPS   && <CapsView   onBack={goBack} />}
+    {view === V.VIDEO  && <VideoView  onBack={goBack} />}
+  </Shell>
+</>
+```
+
+);
+}
