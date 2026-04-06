@@ -20,9 +20,10 @@
       font-family: 'Inter', sans-serif;
       background: #000000;
       color: #ffffff;
-      min-height: auto;
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
+      margin: 0;
+      padding: 0;
     }
 
 ```
@@ -132,8 +133,11 @@
 
 /* ─── SHELL ─── */
 #shell {
-  display: flex; flex-direction: column;
-  min-height: auto; position: relative; z-index: 1;
+  display: block;
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 /* ─── TOPBAR ─── */
@@ -162,8 +166,12 @@
 
 /* ─── CONTENT ─── */
 .content {
-  flex: 1; padding: 28px 28px 60px;
-  max-width: 720px; width: 100%; margin: 0 auto;
+  display: block;
+  padding: 28px 28px 60px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  margin-top: 0;
 }
 
 .page-eyebrow {
@@ -372,7 +380,7 @@
 
 /* ─── MOBILE ─── */
 @media (max-width: 520px) {
-  .content { padding: 20px 16px 48px; }
+  .content { padding: 20px 16px 48px; margin-top: 0; }
   .page-title { font-size: 26px; }
   .url-row { flex-direction: column; }
   .btn-primary { width: 100%; }
