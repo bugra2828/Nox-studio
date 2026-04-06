@@ -4,9 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Nox Studio</title>
-<link rel="preconnect" href="[https://fonts.googleapis.com](https://fonts.googleapis.com)"/>
-<link rel="preconnect" href="[https://fonts.gstatic.com](https://fonts.gstatic.com)" crossorigin/>
-<link href="[https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap)" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 /* ─── RESET & BASE ─── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -213,7 +213,7 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;min-height:100vh;
     <span class="sb-label">Tools</span>
     <button class="sb-link" data-view="script" onclick="navigate('script')">
       <span class="sb-icon"><svg viewBox="0 0 24 24"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg></span>
-      AI Script Generator<span class="sb-badge">Beta</span>
+      AI Script Generator<span class="sb-badge">Live</span>
     </button>
     <button class="sb-link" data-view="voice" onclick="navigate('voice')">
       <span class="sb-icon"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="9" y1="22" x2="15" y2="22"/></svg></span>
@@ -263,7 +263,7 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;min-height:100vh;
 <script>
 /* ═══════════════════════════════════════════════════════
    NOX STUDIO — Vanilla JS SPA
-   Replicate API compatible (REPLICATE_API_TOKEN via /api/replicate proxy)
+   LIVE: Replicate Llama-3 API Connected
 ═══════════════════════════════════════════════════════ */
 
 /* ── NOISE BACKGROUND ── */
@@ -304,7 +304,7 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;min-height:100vh;
 
 /* ── STATE ── */
 let currentView = 'home';
-let sharedScript = '';  // passed from Script → Voice
+let sharedScript = '';  
 
 /* ── SIDEBAR ── */
 function openSidebar() {
@@ -324,7 +324,6 @@ function navigate(view) {
   currentView = view;
   closeSidebar();
   document.getElementById('view-badge').textContent = VIEW_LABELS[view] || '';
-  // update active sidebar link
   document.querySelectorAll('.sb-link').forEach(el => {
     el.classList.toggle('active', el.dataset.view === view);
   });
@@ -380,13 +379,12 @@ function mkDD(id, label, options, selectedIdx) {
     </div>`;
 }
 
-/* ── DROPDOWN LOGIC ── */
+/* ── DROPDOWNS ── */
 const ddState = {};
 function toggleDD(id) {
   const menu = document.getElementById('dd-menu-'+id);
   const trigger = menu.previousElementSibling;
   const isOpen = menu.style.display !== 'none';
-  // close all
   document.querySelectorAll('.dd-menu').forEach(m => { m.style.display='none'; m.previousElementSibling.classList.remove('open'); });
   if (!isOpen) { menu.style.display='block'; trigger.classList.add('open'); }
 }
@@ -397,7 +395,6 @@ function selectDD(id, value, el) {
   el.classList.add('selected');
   document.getElementById('dd-menu-'+id).style.display='none';
   document.getElementById('dd-menu-'+id).previousElementSibling.classList.remove('open');
-  // update summary cards if on script view
   if (id === 'hook') { const el2=document.getElementById('sum-hook'); if(el2) el2.textContent=value; }
   if (id === 'dur')  { const el2=document.getElementById('sum-dur');  if(el2) el2.textContent=value; }
 }
@@ -407,7 +404,7 @@ document.addEventListener('click', function(e) {
   }
 });
 
-/* ── MOCK DATA ── */
+/* ── DATA ── */
 const HOOK_TYPES = ['Controversial','Question-Based','Story-Driven','Result-Oriented','Mistake-Avoidance','Urgency-Based'];
 const DURATION_OPTIONS = ['0 - 30 seconds','30 - 60 seconds','1 - 2 minutes'];
 const VOICE_PROFILES = ['The Storyteller','The Analyst','The Hype'];
@@ -416,59 +413,10 @@ const PACE_OPTIONS = ['0.8x','1.0x','1.25x'];
 const WAVE_HEIGHTS = [30,55,40,70,85,60,45,90,75,50,65,80,55,40,72,88,60,45,70,55,42,68,82,58,48,76,90,62,50,38,66,80,54,44,72,86,60,48,74,56];
 
 const MOCK_SUMMARY = {
-  title:'10 Productivity Hacks That Changed My Life', platform:'YouTube', length:'8m 42s',
-  topic:'Productivity / Self-improvement', hook:'Creator opens with a bold claim backed by a 90-day experiment.',
-  structure:'Hook -> Problem -> 10 tips (list format) -> CTA', angle:'First-person transformation story with data points.'
+  title:'10 Productivity Hacks', platform:'YouTube', length:'8m 42s',
+  topic:'Productivity', hook:'Bold claim backed by a 90-day experiment.',
+  structure:'Hook -> Problem -> 10 tips -> CTA', angle:'Transformation story'
 };
-
-function buildMock(topic, hook, duration) {
-  const t = topic || 'your topic';
-  const hooks = {
-    'Controversial': `**Nobody wants to hear this about ${t} — but it's true.**`,
-    'Question-Based': `**What if everything you knew about ${t} was completely wrong?**`,
-    'Story-Driven': `**I almost quit ${t} entirely. Then one thing changed everything.**`,
-    'Result-Oriented': `**I went from zero to results with ${t} in under 30 days. Here's exactly how.**`,
-    'Mistake-Avoidance': `**Stop. If you're doing ${t} this way, you're wasting your time.**`,
-    'Urgency-Based': `**The window for ${t} is closing. Most people will miss it entirely.**`
-  };
-  const bodies = {
-    '0 - 30 seconds': [`Here's what the top 1% already know about **${t}**:`,'',`- The common approach is broken by design`,`- **Speed beats perfection** every single time`,`- One focused action today outweighs a week of planning`,'',`You don't need more information. You need to **start now.**`],
-    '30 - 60 seconds': [`Most people approach **${t}** the same way — and wonder why they're stuck.`,'',`Here's the framework that actually works:`,'',`- **Step 1:** Strip it down to the single most important action`,`- **Step 2:** Execute that action before you feel ready`,`- **Step 3:** Measure the result, not the effort`,`- **Step 4:** Double down on what works, cut everything else`,'',`The secret isn't a new tactic. It's **radical consistency** on the basics.`],
-    '1 - 2 minutes': [`Let me tell you what took me years to figure out about **${t}**.`,'',`The mainstream advice is designed for average results. If you want to stand out, you need a different lens.`,'',`**The three pillars nobody talks about:**`,'',`- **Clarity over complexity** — most people overcomplicate ${t} because complexity feels like progress`,`- **Momentum over motivation** — don't wait to feel inspired, build a system that works without it`,`- **Output over input** — stop consuming content about ${t} and start producing results from it`,'',`I spent 18 months doing it the wrong way. The shift happened when I stopped optimising the plan and started **executing the minimum viable version.**`,'',`The result? Everything changed. And it can for you too.`]
-  };
-  const ctas = {
-    'Controversial': `**Follow for more uncomfortable truths about ${t}.**`,
-    'Question-Based': `**Drop a comment — what's your take on ${t}?**`,
-    'Story-Driven': `**Save this. You'll want to come back to it.**`,
-    'Result-Oriented': `**Follow for the full breakdown — link in bio.**`,
-    'Mistake-Avoidance': `**Share this with someone who needs to hear it.**`,
-    'Urgency-Based': `**Act now. The people who wait always regret it.**`
-  };
-  const bodyLines = bodies[duration] || bodies['30 - 60 seconds'];
-  return ['[HOOK]', hooks[hook]||hooks['Controversial'], '', '[BODY]', ...bodyLines, '', '[CTA]', ctas[hook]||ctas['Controversial']].join('\n');
-}
-
-/* ── REPLICATE API ──────────────────────────────────────────
-   Calls /api/replicate (your Vercel serverless function).
-   That function reads process.env.REPLICATE_API_TOKEN server-side
-   and proxies the request to api.replicate.com — so the token
-   is never exposed in the browser.
-─────────────────────────────────────────────────────────── */
-async function callReplicate(prompt) {
-  try {
-    const resp = await fetch('/api/replicate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input: { prompt, max_new_tokens: 600, temperature: 0.85 } })
-    });
-    if (!resp.ok) throw new Error('API error ' + resp.status);
-    const data = await resp.json();
-    if (Array.isArray(data.output)) return data.output.join('');
-    return data.output || '';
-  } catch (e) {
-    return null; // fall back to simulation
-  }
-}
 
 /* ── VIEWS ── */
 
@@ -550,7 +498,7 @@ function renderScript() {
     <div id="script-loading" style="display:none"><div class="load-bar"></div></div>
     <div id="script-output" style="display:none">
       <div class="card">
-        <div style="margin-bottom:14px;font-size:11px;font-style:italic;color:rgba(255,255,255,.35);letter-spacing:.3px">✦ Simulation Mode — UI Testing</div>
+        <div style="margin-bottom:14px;font-size:11px;font-style:italic;color:#4ade80;letter-spacing:.3px">✦ Live Mode — Connected to Llama-3-8b</div>
         <span class="card-label">Generated Script</span>
         <div class="script-box" id="script-box"></div>
         <div class="btn-row">
@@ -564,27 +512,65 @@ function renderScript() {
 
 let scriptText = '';
 
-function generateScript() {
+/* ── LIVE REPLICATE API CONNECTION ── */
+async function generateScript() {
   const topic = document.getElementById('script-topic').value.trim();
   if (!topic) return;
+
   const loading = document.getElementById('script-loading');
   const output  = document.getElementById('script-output');
   const btn     = document.getElementById('btn-gen-script');
+  const scriptBox = document.getElementById('script-box');
+
   loading.style.display = 'block';
   output.style.display  = 'none';
   btn.style.opacity     = '.6';
   btn.style.pointerEvents = 'none';
   btn.querySelector('.ui-btn-inner').lastChild.textContent = ' Generating...';
 
-  setTimeout(() => {
-    scriptText = buildMock(topic, ddState.hook||HOOK_TYPES[0], ddState.dur||DURATION_OPTIONS[0]);
-    document.getElementById('script-box').innerHTML = renderScript(scriptText);
-    loading.style.display = 'none';
-    output.style.display  = 'block';
-    btn.style.opacity     = '1';
-    btn.style.pointerEvents = 'auto';
-    btn.querySelector('.ui-btn-inner').lastChild.textContent = ' Generate Script';
-  }, 2500);
+  // LLAMA-3 PROMPT TEMPLATE SETUP
+  const systemPrompt = "You are a viral content expert. Write dark, engaging, and scroll-stopping scripts for TikTok and Reels. Structure the script EXACTLY with these tags: [HOOK], [BODY], and [CTA]. Keep it concise and highly impactful.";
+  const userPrompt = `Write a ${ddState.dur} script with a "${ddState.hook}" hook style about: ${topic}`;
+  const llamaPrompt = `<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n${systemPrompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n${userPrompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n`;
+
+  try {
+    const resp = await fetch('/api/replicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        version: "36503077aa6533169719336d3c011e40040bc43c1622b7d5982e99214cd7008e",
+        input: {
+          prompt: llamaPrompt,
+          max_new_tokens: 512,
+          temperature: 0.7,
+          prompt_template: "{prompt}" 
+        }
+      })
+    });
+
+    const data = await resp.json();
+    let finalScript = "";
+
+    if (Array.isArray(data.output)) {
+      finalScript = data.output.join('');
+    } else if (data.output) {
+      finalScript = data.output;
+    } else {
+      finalScript = "Bağlantı başarılı fakat modelden yanıt alınamadı. Vercel loglarını kontrol edin.";
+    }
+
+    scriptText = finalScript;
+    scriptBox.innerHTML = renderScript(scriptText);
+  } catch (error) {
+    scriptBox.innerHTML = "Hata: API bağlantısı kurulamadı. Lütfen 'api/replicate.js' dosyasını ve API anahtarınızı kontrol edin.";
+    console.error(error);
+  }
+
+  loading.style.display = 'none';
+  output.style.display  = 'block';
+  btn.style.opacity     = '1';
+  btn.style.pointerEvents = 'auto';
+  btn.querySelector('.ui-btn-inner').lastChild.textContent = ' Generate Script';
 }
 
 function sendToVoice() {
@@ -808,11 +794,9 @@ function render() {
 }
 
 function bindEvents() {
-  // Home CTA
   const btnEnter = document.getElementById('btn-enter');
   if (btnEnter) btnEnter.addEventListener('click', () => navigate('dash'));
 
-  // Script
   const btnGenScript = document.getElementById('btn-gen-script');
   if (btnGenScript) btnGenScript.addEventListener('click', generateScript);
   const btnSendVoice = document.getElementById('btn-send-voice');
@@ -820,11 +804,9 @@ function bindEvents() {
   const btnResetScript = document.getElementById('btn-reset-script');
   if (btnResetScript) btnResetScript.addEventListener('click', resetScript);
 
-  // Voice
   const btnGenVoice = document.getElementById('btn-gen-voice');
   if (btnGenVoice) btnGenVoice.addEventListener('click', generateVoice);
 
-  // Link
   const btnProcessLink = document.getElementById('btn-process-link');
   if (btnProcessLink) btnProcessLink.addEventListener('click', processLink);
   const btnCreateVersion = document.getElementById('btn-create-version');
@@ -832,11 +814,9 @@ function bindEvents() {
   const btnResetLink = document.getElementById('btn-reset-link');
   if (btnResetLink) btnResetLink.addEventListener('click', resetLink);
 
-  // Captions
   const btnGenCaps = document.getElementById('btn-gen-caps');
   if (btnGenCaps) btnGenCaps.addEventListener('click', generateCaps);
 
-  // Close dropdowns when clicking inside content areas (not dd-wrap)
   const content = document.querySelector('.content');
   if (content) content.addEventListener('click', function(e) {
     if (!e.target.closest('.dd-wrap')) {
